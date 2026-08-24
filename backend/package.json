@@ -1,0 +1,33 @@
+{
+  "name": "leimoz-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:mock": "cross-env MOCK_MODE=true tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "db:setup": "prisma generate && prisma db push",
+    "seed": "tsx scripts/seed.ts",
+    "seed:embeddings": "cross-env MOCK_MODE=false tsx scripts/seed-embeddings.ts",
+    "seed:lei": "cross-env MOCK_MODE=false tsx scripts/seed-lei-trabalho.ts",
+    "test": "tsx scripts/test-rag.ts",
+    "test:mock": "cross-env MOCK_MODE=true tsx scripts/test-rag.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "@fastify/multipart": "^9.0.0",
+    "@prisma/client": "^6.0.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "cross-env": "^7.0.3",
+    "prisma": "^6.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
