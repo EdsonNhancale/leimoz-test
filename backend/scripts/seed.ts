@@ -274,7 +274,7 @@ async function main() {
       await prisma.$executeRawUnsafe(
         `
         INSERT INTO document_chunks
-          (id, document_id, content, chunk_index, keywords)
+          (id, "documentId", content, "chunkIndex", keywords)
         VALUES
           (gen_random_uuid(), $1, $2, $3, $4)
         `,

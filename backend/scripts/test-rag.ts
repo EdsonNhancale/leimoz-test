@@ -33,13 +33,13 @@ async function searchDocuments(
       SELECT
         dc.id,
         dc.content,
-        dc.chunk_index,
-        dc.document_id,
+        dc."chunkIndex",
+        dc."documentId",
         d.title AS document_title,
         d.category AS document_category,
         1 - (dc.embedding <=> $1::vector) AS similarity
       FROM document_chunks dc
-      INNER JOIN documents d ON d.id = dc.document_id
+      INNER JOIN documents d ON d.id = dc."documentId"
       WHERE (1 - (dc.embedding <=> $1::vector)) >= 0.2
         AND d.category = $2
       ORDER BY dc.embedding <=> $1::vector
@@ -54,13 +54,13 @@ async function searchDocuments(
       SELECT
         dc.id,
         dc.content,
-        dc.chunk_index,
-        dc.document_id,
+        dc."chunkIndex",
+        dc."documentId",
         d.title AS document_title,
         d.category AS document_category,
         1 - (dc.embedding <=> $1::vector) AS similarity
       FROM document_chunks dc
-      INNER JOIN documents d ON d.id = dc.document_id
+      INNER JOIN documents d ON d.id = dc."documentId"
       WHERE (1 - (dc.embedding <=> $1::vector)) >= 0.2
       ORDER BY dc.embedding <=> $1::vector
       LIMIT 5

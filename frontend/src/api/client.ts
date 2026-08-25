@@ -56,7 +56,8 @@ export type ChatResponse = {
   }[];
   confidence: "high" | "medium" | "low";
   avgSimilarity: number;
-  searchMethod: "hybrid" | "vector" | "keyword";
+  searchMethod: "hybrid" | "hybrid-loose" | "vector" | "keyword";
+  searchExpanded?: boolean;
   queryKeywords: string[];
 };
 

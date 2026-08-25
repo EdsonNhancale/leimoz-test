@@ -1,0 +1,28 @@
+{
+  "name": "leimoz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LeiMoz — Plataforma Nacional de Literacia Jurídica de Moçambique",
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install && npm --prefix backend run prisma:generate",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:stop": "docker compose stop",
+    "db:wait": "node -e \"setTimeout(()=>console.log('Waiting for Postgres...'), 3000)\"",
+    "db:setup": "npm --prefix backend run db:setup",
+    "db:seed": "npm --prefix backend run seed && npm --prefix backend run seed:embeddings",
+    "db:seed:lei": "npm --prefix backend run seed:lei && npm --prefix backend run seed:embeddings",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev": "concurrently -n docker,backend,frontend -c blue,green,magenta --kill-others-on-fail \"npm run docker:up && npm run db:wait\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "setup": "npm run docker:up && npm run db:wait && npm run install:all && npm run db:seed",
+    "setup:full": "npm run docker:up && npm run db:wait && npm run install:all && npm run db:seed && npm run db:seed:lei",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "start": "npm --prefix backend run start",
+    "health:api": "node -e \"fetch('http://localhost:3000/health').then(r=>r.json()).then(j=>console.log(JSON.stringify(j,null,2))).catch(e=>console.error('API offline:', e.message))\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3"
+  }
+}

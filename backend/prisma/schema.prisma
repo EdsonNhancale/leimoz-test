@@ -13,8 +13,8 @@ model Document {
   content   String
   category  String?
   metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
 
   chunks DocumentChunk[]
 
@@ -22,18 +22,15 @@ model Document {
 }
 
 model DocumentChunk {
-  id         String   @id @default(uuid())
-  documentId String
+  id         String                        @id @default(uuid())
+  documentId String                        @map("documentId")
   content    String
-  chunkIndex Int
+  chunkIndex Int                           @map("chunkIndex")
   keywords   String?
-  createdAt  DateTime @default(now())
+  embedding  Unsupported("vector(768)")?
+  createdAt  DateTime                      @default(now()) @map("createdAt")
 
-  document Document @relation(
-    fields: [documentId],
-    references: [id],
-    onDelete: Cascade
-  )
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
   @@map("document_chunks")

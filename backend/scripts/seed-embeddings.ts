@@ -6,19 +6,19 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🔄 A gerar embeddings para chunks existentes...\n");
 
-  const chunks = await prisma.documentChunk.findMany({
-    where: {
-      embedding: null,
-    },
-    include: {
-      document: {
-        select: {
-          title: true,
-          category: true,
-        },
-      },
-    },
-  });
+  const chunks = await prisma.$queryRawUnsafe<Array<{
+    id: string;
+    content: string;
+    document: { title: string; category: string | null };
+  }>>(`
+    SELECT
+      dc.id,
+      dc.content,
+      json_build_object('title', d.title, 'category', d.category) AS document
+    FROM document_chunks dc
+    INNER JOIN documents d ON d.id = dc."documentId"
+    WHERE dc.embedding IS NULL
+  `);
 
   if (chunks.length === 0) {
     console.log("✅ Todos os chunks já têm embeddings.");

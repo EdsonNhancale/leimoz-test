@@ -37,7 +37,7 @@ export async function documentRoutes(app: FastifyInstance) {
       await prisma.$executeRawUnsafe(
         `
         INSERT INTO document_chunks
-          (id, document_id, content, chunk_index, embedding, keywords)
+          (id, "documentId", content, "chunkIndex", embedding, keywords)
         VALUES
           (gen_random_uuid(), $1, $2, $3, $4::vector, $5)
         `,

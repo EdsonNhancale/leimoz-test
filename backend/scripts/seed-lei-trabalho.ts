@@ -3,6 +3,70 @@ import { chunkText, extractKeywords } from "../src/utils/chunk";
 
 const prisma = new PrismaClient();
 
+async function main() {
+  console.log("🌱 A iniciar seed da Lei n.º 13/2023 (Lei do Trabalho)...\n");
+
+  const existingDocs = await prisma.document.count({
+    where: { category: "trabalho" },
+  });
+  if (existingDocs > 0) {
+    console.log(`⚠️  Já existem ${existingDocs} documentos de trabalho na base de dados.`);
+    console.log("   A manter documentos existentes, apenas adicionar os da Lei n.º 13/2023...\n");
+  }
+
+  let totalChunks = 0;
+
+  for (const doc of LEI_DO_TRABALHO) {
+    console.log(`📄 A processar: ${doc.title}`);
+
+    const document = await prisma.document.create({
+      data: {
+        title: doc.title,
+        content: doc.content,
+        category: doc.category,
+      },
+    });
+
+    const chunkResults = chunkText(doc.content);
+
+    for (const chunk of chunkResults) {
+      const keywords = extractKeywords(chunk.content).join(", ");
+
+      await prisma.$executeRawUnsafe(
+        `
+        INSERT INTO document_chunks
+          (id, "documentId", content, "chunkIndex", keywords)
+        VALUES
+          (gen_random_uuid(), $1, $2, $3, $4)
+        `,
+        document.id,
+        chunk.content,
+        chunk.metadata.index,
+        keywords
+      );
+      totalChunks++;
+    }
+
+    console.log(`   ✅ ${chunkResults.length} chunks criados`);
+  }
+
+  console.log(`\n🎉 Seed da Lei do Trabalho concluído!`);
+  console.log(`   📚 ${LEI_DO_TRABALHO.length} documentos criados`);
+  console.log(`   📝 ${totalChunks} chunks indexados`);
+  console.log(`\n⚠️  Nota: Embeddings não foram gerados (mock mode desligado).`);
+  console.log(`   Para gerar embeddings reais, execute:`);
+  console.log(`   npm run seed:embeddings`);
+}
+
+main()
+  .catch((e) => {
+    console.error("❌ Erro no seed:", e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
 const LEI_DO_TRABALHO = [
   {
     title: "Lei n.º 13/2023 — Disposições Gerais, Objecto e Âmbito",

@@ -12,16 +12,25 @@ type SearchResult = {
   document_category: string | null;
   similarity: number;
   rank_score: number;
+  "chunkIndex"?: number;
+  "documentId"?: string;
+};
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 type ChatOptions = {
   category?: string;
   topK?: number;
+  history?: ChatMessage[];
 };
 
-const SIMILARITY_THRESHOLD = 0.3;
-const VECTOR_WEIGHT = 0.7;
-const KEYWORD_WEIGHT = 0.3;
+const SIMILARITY_THRESHOLD = 0.30;
+const SIMILARITY_THRESHOLD_LOOSE = 0.20;
+const VECTOR_WEIGHT = 0.72;
+const KEYWORD_WEIGHT = 0.28;
 
 function buildKeywordPattern(keywords: string[]): string {
   return keywords
@@ -29,7 +38,7 @@ function buildKeywordPattern(keywords: string[]): string {
     .join("|");
 }
 
-function reresults(
+function rerankResults(
   results: SearchResult[],
   queryKeywords: string[]
 ): SearchResult[] {
@@ -49,8 +58,16 @@ function reresults(
       }
     }
 
-    const normalizedKeywordScore = Math.min(keywordScore / (queryKeywords.length * 3), 1);
-    const combinedScore = VECTOR_WEIGHT * r.similarity + KEYWORD_WEIGHT * normalizedKeywordScore;
+    const titleLower = (r.document_title || "").toLowerCase();
+    for (const kw of queryKeywords) {
+      if (titleLower.includes(kw.toLowerCase())) {
+        keywordScore += 2;
+      }
+    }
+
+    const normalizedKeywordScore = Math.min(keywordScore / Math.max(queryKeywords.length * 3, 1), 1);
+    const vectorScore = Number(r.similarity) || 0;
+    const combinedScore = VECTOR_WEIGHT * vectorScore + KEYWORD_WEIGHT * normalizedKeywordScore;
 
     return {
       ...r,
@@ -73,144 +90,249 @@ function deduplicateByDocument(results: SearchResult[]): SearchResult[] {
   return Array.from(seen.values());
 }
 
+function buildHistoryPrompt(history: ChatMessage[] = []): string {
+  if (!history.length) return "";
+
+  const recent = history.slice(-6);
+  const lines: string[] = [];
+
+  lines.push("HISTÓRICO DA CONVERSA (últimas mensagens):");
+  for (const msg of recent) {
+    const prefix = msg.role === "user" ? "  Utilizador" : "  Assistente";
+    lines.push(`${prefix}: ${msg.content.slice(0, 600)}`);
+  }
+  lines.push("");
+  lines.push("INSTRUÇÃO: A resposta deve ser coerente com o histórico acima. Se a pergunta for um follow-up, use o contexto anterior para ser mais preciso.");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+function buildQuestionWithContext(question: string, history: ChatMessage[] = []): string {
+  if (!history.length) return question;
+
+  const recentUser = history
+    .filter((m) => m.role === "user")
+    .slice(-2)
+    .map((m) => m.content)
+    .join(" | ");
+
+  if (question.length < 30 && recentUser) {
+    return `Pergunta anterior: "${recentUser}" | Pergunta actual: "${question}"`;
+  }
+  return question;
+}
+
+const LEGAL_STOPWORDS = new Set([
+  "o", "a", "os", "as", "e", "ou", "de", "do", "da", "dos", "das", "em",
+  "no", "na", "nos", "nas", "por", "para", "com", "sem", "sobre", "entre",
+  "que", "se", "não", "sim", "tem", "ter", "são", "ser", "pode", "podem",
+  "lei", "artigo", "art", "qual", "quais", "qual", "como", "onde", "quando",
+  "quem", "minha", "meu", "seu", "sua", "me", "lhe", "isso", "isto",
+  "direito", "lei", "direitos", "dever", "deveres", "obrigação",
+]);
+
+function extractLegalKeywords(text: string): string[] {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\w\sàáâãéêíóôõúüçñ]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 3 && !LEGAL_STOPWORDS.has(w));
+
+  const freq = new Map<string, number>();
+  for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
+
+  return Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([w]) => w);
+}
+
 export async function answerQuestion(
   question: string,
   options: ChatOptions = {}
 ) {
-  const { category, topK = 8 } = options;
+  const { category, topK = 8, history = [] } = options;
+  const enrichedQuestion = buildQuestionWithContext(question, history);
 
-  const embedding = await createEmbedding(question);
+  const embedding = await createEmbedding(enrichedQuestion);
   const vector = `[${embedding.join(",")}]`;
-  const queryKeywords = extractKeywords(question);
+  const queryKeywords = Array.from(new Set([
+    ...extractKeywords(question),
+    ...extractLegalKeywords(question),
+  ])).slice(0, 12);
 
-  let vectorResults: SearchResult[];
+  async function runSearch(params: {
+    threshold: number;
+    vectorLimitMul: number;
+    includeKeyword: boolean;
+  }): Promise<SearchResult[]> {
+    let vectorResults: SearchResult[];
 
-  if (category) {
-    vectorResults = await prisma.$queryRawUnsafe<SearchResult[]>(
-      `
+    const commonVectorSql = `
       SELECT
         dc.id,
         dc.content,
-        dc.chunk_index,
-        dc.document_id,
+        dc."chunkIndex" AS chunk_index,
+        dc."documentId" AS document_id,
         d.title AS document_title,
         d.category AS document_category,
         1 - (dc.embedding <=> $1::vector) AS similarity,
         0 AS rank_score
       FROM document_chunks dc
-      INNER JOIN documents d ON d.id = dc.document_id
+      INNER JOIN documents d ON d.id = dc."documentId"
       WHERE (1 - (dc.embedding <=> $1::vector)) >= $2
-        AND d.category = $3
-      ORDER BY dc.embedding <=> $1::vector
-      LIMIT $4
-      `,
-      vector,
-      SIMILARITY_THRESHOLD,
-      category,
-      topK * 2
-    );
-  } else {
-    vectorResults = await prisma.$queryRawUnsafe<SearchResult[]>(
-      `
-      SELECT
-        dc.id,
-        dc.content,
-        dc.chunk_index,
-        dc.document_id,
-        d.title AS document_title,
-        d.category AS document_category,
-        1 - (dc.embedding <=> $1::vector) AS similarity,
-        0 AS rank_score
-      FROM document_chunks dc
-      INNER JOIN documents d ON d.id = dc.document_id
-      WHERE (1 - (dc.embedding <=> $1::vector)) >= $2
-      ORDER BY dc.embedding <=> $1::vector
-      LIMIT $3
-      `,
-      vector,
-      SIMILARITY_THRESHOLD,
-      topK * 2
-    );
-  }
-
-  let keywordResults: SearchResult[] = [];
-
-  if (queryKeywords.length > 0) {
-    const keywordPattern = buildKeywordPattern(queryKeywords);
+    `;
 
     if (category) {
-      keywordResults = await prisma.$queryRawUnsafe<SearchResult[]>(
-        `
-        SELECT
-          dc.id,
-          dc.content,
-          dc.chunk_index,
-          dc.document_id,
-          d.title AS document_title,
-          d.category AS document_category,
-          0 AS similarity,
-          similarity(dc.content, $1) AS rank_score
-        FROM document_chunks dc
-        INNER JOIN documents d ON d.id = dc.document_id
-        WHERE dc.content ILIKE ANY($2::text[])
-          AND d.category = $3
-        ORDER BY rank_score DESC
-        LIMIT $4
-        `,
-        keywordPattern,
-        queryKeywords.map((k) => `%${k}%`),
+      vectorResults = await prisma.$queryRawUnsafe<SearchResult[]>(
+        `${commonVectorSql} AND d.category = $3 ORDER BY dc.embedding <=> $1::vector LIMIT $4`,
+        vector,
+        params.threshold,
         category,
-        topK
+        Math.floor(topK * params.vectorLimitMul)
       );
     } else {
-      keywordResults = await prisma.$queryRawUnsafe<SearchResult[]>(
-        `
+      vectorResults = await prisma.$queryRawUnsafe<SearchResult[]>(
+        `${commonVectorSql} ORDER BY dc.embedding <=> $1::vector LIMIT $3`,
+        vector,
+        params.threshold,
+        Math.floor(topK * params.vectorLimitMul)
+      );
+    }
+
+    let keywordResults: SearchResult[] = [];
+    if (params.includeKeyword && queryKeywords.length > 0) {
+      const keywordPattern = buildKeywordPattern(queryKeywords);
+      const likeArray = queryKeywords.map((k) => `%${k}%`);
+
+      const commonKwSql = `
         SELECT
           dc.id,
           dc.content,
-          dc.chunk_index,
-          dc.document_id,
+          dc."chunkIndex" AS chunk_index,
+          dc."documentId" AS document_id,
           d.title AS document_title,
           d.category AS document_category,
           0 AS similarity,
           similarity(dc.content, $1) AS rank_score
         FROM document_chunks dc
-        INNER JOIN documents d ON d.id = dc.document_id
+        INNER JOIN documents d ON d.id = dc."documentId"
         WHERE dc.content ILIKE ANY($2::text[])
-        ORDER BY rank_score DESC
-        LIMIT $3
-        `,
-        keywordPattern,
-        queryKeywords.map((k) => `%${k}%`),
-        topK
-      );
+      `;
+
+      if (category) {
+        keywordResults = await prisma.$queryRawUnsafe<SearchResult[]>(
+          `${commonKwSql} AND d.category = $3 ORDER BY rank_score DESC LIMIT $4`,
+          keywordPattern,
+          likeArray,
+          category,
+          topK
+        );
+      } else {
+        keywordResults = await prisma.$queryRawUnsafe<SearchResult[]>(
+          `${commonKwSql} ORDER BY rank_score DESC LIMIT $3`,
+          keywordPattern,
+          likeArray,
+          topK
+        );
+      }
     }
+
+    return [...vectorResults, ...keywordResults];
   }
 
-  const allResults = [...vectorResults, ...keywordResults];
-  const uniqueResults = deduplicateByDocument(allResults);
+  let allResults = await runSearch({
+    threshold: SIMILARITY_THRESHOLD,
+    vectorLimitMul: 2,
+    includeKeyword: true,
+  });
 
-  const reranked = reresults(uniqueResults, queryKeywords);
+  const strictCount = allResults.length;
+  if (allResults.length < Math.max(3, Math.floor(topK / 2))) {
+    const looseResults = await runSearch({
+      threshold: SIMILARITY_THRESHOLD_LOOSE,
+      vectorLimitMul: 4,
+      includeKeyword: true,
+    });
+    allResults = [...allResults, ...looseResults];
+  }
+
+  const uniqueResults = deduplicateByDocument(allResults);
+  const reranked = rerankResults(uniqueResults, queryKeywords);
 
   const finalResults = reranked
     .sort((a, b) => b.rank_score - a.rank_score)
     .slice(0, topK);
 
+  if (finalResults.length > 0 && finalResults.length < strictCount) {
+    const neighborsNeeded: { docId: string; idx: number }[] = [];
+    for (const r of finalResults.slice(0, 4)) {
+      if (r.chunk_index > 0) neighborsNeeded.push({ docId: r.document_id, idx: r.chunk_index - 1 });
+      neighborsNeeded.push({ docId: r.document_id, idx: r.chunk_index + 1 });
+    }
+
+    const neighborChunks = await prisma.$queryRawUnsafe<SearchResult[]>(
+      `
+      SELECT
+        dc.id,
+        dc.content,
+        dc."chunkIndex" AS chunk_index,
+        dc."documentId" AS document_id,
+        d.title AS document_title,
+        d.category AS document_category,
+        0.15 AS similarity,
+        0.15 AS rank_score
+      FROM document_chunks dc
+      INNER JOIN documents d ON d.id = dc."documentId"
+      WHERE (
+        (dc."documentId" = $1 AND dc."chunkIndex" = $2) OR
+        (dc."documentId" = $3 AND dc."chunkIndex" = $4) OR
+        (dc."documentId" = $5 AND dc."chunkIndex" = $6) OR
+        (dc."documentId" = $7 AND dc."chunkIndex" = $8)
+      )
+      LIMIT 8
+      `,
+      ...neighborsNeeded.flatMap((n) => [n.docId, n.idx])
+    );
+
+    if (neighborChunks.length) {
+      for (const n of neighborChunks) n.rank_score = 0.18;
+    }
+  }
+
+  const usedIds = new Set(finalResults.map((r) => r.id));
+  let fallbackResponseText = "";
+
   if (!finalResults.length) {
+    fallbackResponseText = `
+Olá! Obrigado pela sua pergunta sobre **"${question}"**.
+
+Infelizmente, a informação que procura ainda não se encontra na nossa base de conhecimento actual. Estamos em constante expansão — em breve disponibilizaremos mais diplomas legais.
+
+**O que posso fazer por si:**
+1. 📚 **Reformule a pergunta**: tente termos mais técnicos/legais (ex: *"Artigo 141 da Lei do Trabalho sobre aviso prévio"*).
+2. 🏷️ **Filtre por categoria**: escolha *Direito do Trabalho*, *Família*, etc., para refinar.
+3. ⚖️ **Consulte um profissional**: para questões concretas, recomendo a **Ordem dos Advogados de Moçambique** ou a **Inspecção-Geral do Trabalho**.
+4. 📰 **Boletim da República**: consulte a legislação completa em [www.portaldogoverno.gov.mz](https://www.portaldogoverno.gov.mz).
+
+> 📢 **Aviso Legal:** O LeiMoz é uma plataforma de literacia jurídica e **não substitui aconselhamento jurídico profissional**.
+`;
+
     return {
-      answer:
-        "Não encontrei informação suficiente na base de conhecimento. Recomendo consultar um advogado ou verificar directamente a legislação em vigor.",
+      answer: fallbackResponseText,
       sources: [],
       context: [],
       confidence: "low" as const,
       avgSimilarity: 0,
-      searchMethod: "hybrid",
+      searchMethod: strictCount > 0 ? ("hybrid-loose" as const) : ("hybrid" as const),
+      queryKeywords,
+      searchExpanded: strictCount === 0,
     };
   }
 
   const similarities = finalResults.map((r) => Number(r.similarity));
-  const avgSimilarity =
-    similarities.reduce((sum, s) => sum + s, 0) / similarities.length;
+  const avgSimilarity = similarities.reduce((sum, s) => sum + s, 0) / similarities.length;
   const maxSimilarity = Math.max(...similarities);
 
   let confidence: "high" | "medium" | "low";
@@ -223,35 +345,35 @@ export async function answerQuestion(
   }
 
   const context = finalResults
+    .slice(0, 5)
     .map(
       (result, index) =>
-        `[Fonte ${index + 1}] Documento: ${result.document_title}${result.document_category ? ` | Categoria: ${result.document_category}` : ""}\nSimilaridade: ${(Number(result.similarity) * 100).toFixed(1)}% | Relevância: ${(result.rank_score * 100).toFixed(1)}%\nTrecho:\n${result.content}`
+        `[FONTE ${index + 1}] ${result.document_title}${result.document_category ? ` (${result.document_category})` : ""}
+${result.content.slice(0, 800)}`
     )
-    .join("\n\n----------------\n\n");
+    .join("\n\n");
 
-  const prompt = `
-Você é o assistente virtual da LeiMoz — Plataforma Nacional de Literacia Jurídica de Moçambique.
+  const historyPrompt = buildHistoryPrompt(history);
 
-Sua função é responder perguntas sobre legislação moçambicana utilizando SOMENTE a informação presente no CONTEXTO fornecido.
+  const systemPrompt = `Você é o assistente jurídico LeiMoz de Moçambique. Responda em português simples e acolhedor.
 
-REGRAS OBRIGATÓRIAS:
-1. Não invente informações jurídicas.
-2. Não utilize conhecimento externo ao contexto.
-3. Se o contexto não possuir informação suficiente, diga claramente que não encontrou informação suficiente e recomende consultar um profissional de direito.
-4. Responda em português moçambicano, de forma simples e acessível.
-5. Seja claro e objetivo.
-6. Sempre que possível, cite o artigo e a lei especifica.
-7. Formate a resposta para facil leitura.
-8. Indique a confiança na resposta com base na similaridade dos documentos encontrados.
-9. Os resultados foram obtidos por pesquisa híbrida (semântica + palavras-chave).
+REGRAS:
+- SÓ use informação do CONTEXTO fornecido. Não invente artigos.
+- Se o contexto for insuficiente, diga-o.
+- Estruture a resposta com títulos, bullets e emojis moderados.
+- Cite sempre as fontes (nome da lei/artigo).
+- Termine com aviso: é informação geral, não substitui advogado.
+- Nunca comece com "Com base na informação fornecida".`;
 
-CONTEXTO (ordenado por relevância combinada — vector + keyword):
+  const prompt = `${systemPrompt}
+
+${historyPrompt}
+CONTEXTO:
 ${context}
 
-PERGUNTA:
-${question}
+PERGUNTA: ${question}
 
-RESPOSTA:`;
+Responda em Markdown:`;
 
   const answer = await generateAnswer(prompt);
 
@@ -261,7 +383,7 @@ RESPOSTA:`;
       documentId: result.document_id,
       document: result.document_title,
       category: result.document_category,
-      chunk: result.chunk_index,
+      chunk: result.chunk_index ?? 0,
       similarity: Number(result.similarity),
       rankScore: result.rank_score,
     })),
@@ -276,5 +398,6 @@ RESPOSTA:`;
     avgSimilarity,
     searchMethod: "hybrid" as const,
     queryKeywords,
+    searchExpanded: strictCount < finalResults.length,
   };
 }
