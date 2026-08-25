@@ -1,5 +1,6 @@
 const SENTENCE_SPLIT = /(?<=[.!?;:])\s+/;
 const PARAGRAPH_BREAK = /\n\s*\n/;
+const ARTICLE_BREAK = /\n(Artigo\s+\d+)/i;
 
 export interface ChunkOptions {
   chunkSize?: number;
@@ -46,8 +47,8 @@ export function chunkText(
   options: ChunkOptions = {}
 ): ChunkResult[] {
   const {
-    chunkSize = 1000,
-    overlap = 200,
+    chunkSize = 4000,
+    overlap = 500,
     minChunkSize = 100,
   } = options;
 
@@ -70,76 +71,99 @@ export function chunkText(
     return [];
   }
 
-  const paragraphs = splitIntoParagraphs(cleaned);
+  const articles = cleaned.split(ARTICLE_BREAK);
   const chunks: ChunkResult[] = [];
   let currentChunk = "";
   let currentStart = 0;
   let globalOffset = 0;
 
-  for (const paragraph of paragraphs) {
-    const paraStart = cleaned.indexOf(paragraph, globalOffset);
-    if (paraStart !== -1) {
-      globalOffset = paraStart + paragraph.length;
-    }
+  for (let i = 0; i < articles.length; i++) {
+    const part = articles[i];
+    const isArticleHeader = /^Artigo\s+\d+/i.test(part);
 
-    if (currentChunk.length + paragraph.length + 2 > chunkSize && currentChunk.length >= minChunkSize) {
-      chunks.push({
-        content: currentChunk.trim(),
-        metadata: {
-          index: chunks.length,
-          startChar: currentStart,
-          endChar: currentStart + currentChunk.length,
-          sentenceCount: splitIntoSentences(currentChunk).length,
-        },
-      });
+    if (isArticleHeader) {
+      if (currentChunk.length + part.length + 2 > chunkSize && currentChunk.length >= minChunkSize) {
+        chunks.push({
+          content: currentChunk.trim(),
+          metadata: {
+            index: chunks.length,
+            startChar: currentStart,
+            endChar: currentStart + currentChunk.length,
+            sentenceCount: splitIntoSentences(currentChunk).length,
+          },
+        });
 
-      const overlapText = currentChunk.slice(-overlap);
-      const lastSpace = overlapText.indexOf(" ");
-      currentChunk = lastSpace > 0 ? overlapText.slice(lastSpace + 1) : "";
-      currentStart = currentStart + currentChunk.length - overlapText.length;
-    }
+        const overlapText = currentChunk.slice(-overlap);
+        const lastSpace = overlapText.indexOf(" ");
+        currentChunk = lastSpace > 0 ? overlapText.slice(lastSpace + 1) : "";
+        currentStart = currentStart + currentChunk.length - overlapText.length;
+      }
 
-    if (paragraph.length > chunkSize) {
-      const sentences = splitIntoSentences(paragraph);
-      let sentenceBuffer = "";
+      currentChunk = currentChunk ? currentChunk + "\n" + part : part;
+    } else {
+      const paragraphs = splitIntoParagraphs(part);
 
-      for (const sentence of sentences) {
-        if (sentenceBuffer.length + sentence.length + 1 > chunkSize && sentenceBuffer.length >= minChunkSize) {
-          if (currentChunk) {
-            currentChunk += " " + sentenceBuffer;
-          } else {
-            currentChunk = sentenceBuffer;
+      for (const paragraph of paragraphs) {
+        if (currentChunk.length + paragraph.length + 2 > chunkSize && currentChunk.length >= minChunkSize) {
+          chunks.push({
+            content: currentChunk.trim(),
+            metadata: {
+              index: chunks.length,
+              startChar: currentStart,
+              endChar: currentStart + currentChunk.length,
+              sentenceCount: splitIntoSentences(currentChunk).length,
+            },
+          });
+
+          const overlapText = currentChunk.slice(-overlap);
+          const lastSpace = overlapText.indexOf(" ");
+          currentChunk = lastSpace > 0 ? overlapText.slice(lastSpace + 1) : "";
+          currentStart = currentStart + currentChunk.length - overlapText.length;
+        }
+
+        if (paragraph.length > chunkSize) {
+          const sentences = splitIntoSentences(paragraph);
+          let sentenceBuffer = "";
+
+          for (const sentence of sentences) {
+            if (sentenceBuffer.length + sentence.length + 1 > chunkSize && sentenceBuffer.length >= minChunkSize) {
+              if (currentChunk) {
+                currentChunk += " " + sentenceBuffer;
+              } else {
+                currentChunk = sentenceBuffer;
+              }
+
+              if (currentChunk.length >= minChunkSize) {
+                chunks.push({
+                  content: currentChunk.trim(),
+                  metadata: {
+                    index: chunks.length,
+                    startChar: currentStart,
+                    endChar: currentStart + currentChunk.length,
+                    sentenceCount: splitIntoSentences(currentChunk).length,
+                  },
+                });
+
+                const overlapText = currentChunk.slice(-overlap);
+                const lastSpace = overlapText.indexOf(" ");
+                currentChunk = lastSpace > 0 ? overlapText.slice(lastSpace + 1) : "";
+                currentStart = currentStart + currentChunk.length - overlapText.length;
+                sentenceBuffer = "";
+              } else {
+                sentenceBuffer = sentence;
+              }
+            } else {
+              sentenceBuffer = sentenceBuffer ? sentenceBuffer + " " + sentence : sentence;
+            }
           }
 
-          if (currentChunk.length >= minChunkSize) {
-            chunks.push({
-              content: currentChunk.trim(),
-              metadata: {
-                index: chunks.length,
-                startChar: currentStart,
-                endChar: currentStart + currentChunk.length,
-                sentenceCount: splitIntoSentences(currentChunk).length,
-              },
-            });
-
-            const overlapText = currentChunk.slice(-overlap);
-            const lastSpace = overlapText.indexOf(" ");
-            currentChunk = lastSpace > 0 ? overlapText.slice(lastSpace + 1) : "";
-            currentStart = currentStart + currentChunk.length - overlapText.length;
-            sentenceBuffer = "";
-          } else {
-            sentenceBuffer = sentence;
+          if (sentenceBuffer) {
+            currentChunk = currentChunk ? currentChunk + " " + sentenceBuffer : sentenceBuffer;
           }
         } else {
-          sentenceBuffer = sentenceBuffer ? sentenceBuffer + " " + sentence : sentence;
+          currentChunk = currentChunk ? currentChunk + "\n\n" + paragraph : paragraph;
         }
       }
-
-      if (sentenceBuffer) {
-        currentChunk = currentChunk ? currentChunk + " " + sentenceBuffer : sentenceBuffer;
-      }
-    } else {
-      currentChunk = currentChunk ? currentChunk + "\n\n" + paragraph : paragraph;
     }
   }
 

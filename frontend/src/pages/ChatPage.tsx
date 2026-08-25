@@ -137,8 +137,25 @@ function TypingDots() {
   );
 }
 
+const STORAGE_KEY = "leimoz-chat-messages";
+
+function loadMessages(): Message[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMessages(msgs: Message[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs));
+  } catch {}
+}
+
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedContext, setExpandedContext] = useState<Record<number, boolean>>({});
@@ -152,6 +169,10 @@ export default function ChatPage() {
       .then(setStats)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    saveMessages(messages);
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -218,6 +239,7 @@ export default function ChatPage() {
   function handleClearChat() {
     setMessages([]);
     setExpandedContext({});
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -418,217 +440,6 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{msg.content}</div>
-              )}
-
-              {msg.role === "assistant" && msg.confidence && (
-                <div
-                  style={{
-                    marginTop: "1rem",
-                    paddingTop: "0.75rem",
-                    borderTop: "1px solid var(--border)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      marginBottom: "0.5rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <ConfidenceBadge level={msg.confidence} />
-                    {msg.searchMethod && (
-                      <SearchMethodBadge method={msg.searchMethod} expanded={msg.searchExpanded} />
-                    )}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.75rem",
-                      marginBottom: "0.75rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {msg.avgSimilarity !== undefined && msg.avgSimilarity > 0 && (
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: 180 }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                          Similaridade média:
-                        </span>
-                        <SimilarityBar value={msg.avgSimilarity} />
-                      </div>
-                    )}
-                  </div>
-
-                  {msg.queryKeywords && msg.queryKeywords.length > 0 && (
-                    <div style={{ marginBottom: "0.75rem" }}>
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                        🔑 Palavras-chave:{" "}
-                      </span>
-                      {msg.queryKeywords.map((kw, k) => (
-                        <span
-                          key={k}
-                          style={{
-                            display: "inline-block",
-                            padding: "0.1rem 0.4rem",
-                            margin: "0.1rem",
-                            background: "var(--border)",
-                            borderRadius: 3,
-                            fontSize: "0.7rem",
-                            fontFamily: "monospace",
-                          }}
-                        >
-                          {kw}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {msg.context && msg.context.length > 0 && (
-                    <div style={{ marginBottom: "0.75rem" }}>
-                      <button
-                        onClick={() => toggleContext(i)}
-                        style={{
-                          background: "none",
-                          color: "var(--primary)",
-                          fontSize: "0.8rem",
-                          fontWeight: 600,
-                          padding: "0.25rem 0",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.375rem",
-                        }}
-                      >
-                        {expandedContext[i] ? "▼" : "▶"} Contexto encontrado (
-                        {msg.context.length} trecho{msg.context.length > 1 ? "s" : ""})
-                      </button>
-
-                      {expandedContext[i] && (
-                        <div style={{ marginTop: "0.5rem", display: "grid", gap: "0.5rem" }}>
-                          {msg.context.map((ctx, j) => (
-                            <div
-                              key={j}
-                              className="context-card"
-                              style={{
-                                background: "var(--surface)",
-                                border: "1px solid var(--border)",
-                                borderRadius: "var(--radius)",
-                                padding: "0.75rem",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  marginBottom: "0.375rem",
-                                  flexWrap: "wrap",
-                                  gap: "0.25rem",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: "0.75rem",
-                                    fontWeight: 700,
-                                    color: "var(--primary)",
-                                  }}
-                                >
-                                  📄 {ctx.document}
-                                  {ctx.category &&
-                                    ` — ${categoryLabels[ctx.category] || ctx.category}`}
-                                </span>
-                              </div>
-                              <div style={{ display: "flex", gap: "1rem", marginBottom: "0.375rem" }}>
-                                <div style={{ flex: 1 }}>
-                                  <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)" }}>
-                                    Similaridade:{" "}
-                                  </span>
-                                  <SimilarityBar value={ctx.similarity} />
-                                </div>
-                                {ctx.rankScore > 0 && (
-                                  <div style={{ flex: 1 }}>
-                                    <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)" }}>
-                                      Relevância:{" "}
-                                    </span>
-                                    <SimilarityBar value={ctx.rankScore} />
-                                  </div>
-                                )}
-                              </div>
-                              <p
-                                style={{
-                                  fontSize: "0.8rem",
-                                  color: "var(--text-secondary)",
-                                  marginTop: "0.375rem",
-                                  lineHeight: 1.5,
-                                  maxHeight: 120,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {ctx.content}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div>
-                      <p
-                        style={{
-                          fontSize: "0.8rem",
-                          fontWeight: 600,
-                          color: "var(--text-secondary)",
-                          marginBottom: "0.375rem",
-                        }}
-                      >
-                        📚 Fontes citadas:
-                      </p>
-                      {msg.sources.map((s, j) => (
-                        <div
-                          key={j}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
-                            fontSize: "0.8rem",
-                            color: "var(--text-secondary)",
-                            marginBottom: "0.25rem",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 22,
-                              height: 22,
-                              borderRadius: "50%",
-                              background: "var(--primary)",
-                              color: "white",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "0.65rem",
-                              fontWeight: 700,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {j + 1}
-                          </span>
-                          <span style={{ flex: 1 }}>
-                            {s.document}
-                            {s.category && ` (${categoryLabels[s.category] || s.category})`}
-                          </span>
-                          <div style={{ width: 100 }}>
-                            <SimilarityBar value={s.similarity} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               )}
             </div>
           </div>

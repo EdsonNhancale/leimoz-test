@@ -77,17 +77,23 @@ function rerankResults(
 }
 
 function deduplicateByDocument(results: SearchResult[]): SearchResult[] {
-  const seen = new Map<string, SearchResult>();
+  const seen = new Map<string, SearchResult[]>();
 
   for (const r of results) {
     const key = r.document_id;
-    const existing = seen.get(key);
-    if (!existing || r.rank_score > existing.rank_score) {
-      seen.set(key, r);
+    if (!seen.has(key)) {
+      seen.set(key, []);
     }
+    seen.get(key)!.push(r);
   }
 
-  return Array.from(seen.values());
+  const deduplicated: SearchResult[] = [];
+  for (const chunks of seen.values()) {
+    chunks.sort((a, b) => b.rank_score - a.rank_score);
+    deduplicated.push(...chunks.slice(0, 3));
+  }
+
+  return deduplicated;
 }
 
 function buildHistoryPrompt(history: ChatMessage[] = []): string {
@@ -148,11 +154,38 @@ function extractLegalKeywords(text: string): string[] {
     .map(([w]) => w);
 }
 
+function verifyCalculation(answer: string, question: string): string {
+  if (answer.includes("Você tem quantos anos") || answer.includes("Pergunta: Você tem quantos")) {
+    return answer;
+  }
+
+  const formulaRegex = /(\d+)\s*[×x*]\s*(\d+)\s*[×x*]\s*(\d[\d.,]*)\s*=\s*(\d[\d.,]*)\s*(?:MT|meticais)?/gi;
+  let match;
+
+  while ((match = formulaRegex.exec(answer)) !== null) {
+    const a = parseInt(match[1], 10);
+    const b = parseInt(match[2], 10);
+    const c = parseFloat(match[3].replace(/\./g, "").replace(",", "."));
+    const stated = parseFloat(match[4].replace(/\./g, "").replace(",", "."));
+    if (isNaN(a) || isNaN(b) || isNaN(c) || isNaN(stated) || a <= 0 || b <= 0 || c <= 0 || stated <= 0) continue;
+
+    const expected = a * b * c;
+    const tolerance = Math.max(expected * 0.005, 1);
+
+    if (Math.abs(expected - stated) > tolerance) {
+      const formatted = expected.toLocaleString("pt-MZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return answer + `\n\n⚠️ **Erro de cálculo:** ${a} × ${b} × ${c.toFixed(2)} = ${formatted} MT (não ${stated.toLocaleString("pt-MZ")} MT)`;
+    }
+  }
+
+  return answer;
+}
+
 export async function answerQuestion(
   question: string,
   options: ChatOptions = {}
 ) {
-  const { category, topK = 8, history = [] } = options;
+  const { category, topK = 12, history = [] } = options;
   const enrichedQuestion = buildQuestionWithContext(question, history);
 
   const embedding = await createEmbedding(enrichedQuestion);
@@ -345,40 +378,121 @@ Infelizmente, a informação que procura ainda não se encontra na nossa base de
   }
 
   const context = finalResults
-    .slice(0, 5)
+    .slice(0, 8)
     .map(
       (result, index) =>
         `[FONTE ${index + 1}] ${result.document_title}${result.document_category ? ` (${result.document_category})` : ""}
-${result.content.slice(0, 800)}`
+${result.content.slice(0, 2000)}`
     )
     .join("\n\n");
 
   const historyPrompt = buildHistoryPrompt(history);
 
-  const systemPrompt = `Você é o assistente jurídico LeiMoz de Moçambique. Responda em português simples e acolhedor.
+  const systemPrompt = `Você é um Assistente Jurídico especializado em Direito do Trabalho da República de Moçambique.
 
-REGRAS:
-- SÓ use informação do CONTEXTO fornecido. Não invente artigos.
-- Se o contexto for insuficiente, diga-o.
-- Estruture a resposta com títulos, bullets e emojis moderados.
-- Cite sempre as fontes (nome da lei/artigo).
-- Termine com aviso: é informação geral, não substitui advogado.
-- Nunca comece com "Com base na informação fornecida".`;
+OBJETIVO:
+Responder perguntas sobre Direito do Trabalho moçambicano de forma juridicamente fundamentada, clara, precisa, imparcial e compreensível.
+
+FONTE DE AUTORIDADE:
+1. A sua principal fonte é o CONTEXTO JURÍDICO fornecido pelo sistema.
+2. Responda apenas com base no CONTEXTO.
+3. Não invente artigos, números, alíneas, prazos, percentagens, valores, indemnizações, requisitos ou excepções.
+4. Não use conhecimento jurídico externo para preencher lacunas do CONTEXTO.
+5. Se a informação necessária não estiver no CONTEXTO, diga claramente que a informação disponível não é suficiente para responder com segurança.
+6. Se houver conflito entre fontes do CONTEXTO, não escolha arbitrariamente: identifique a inconsistência.
+
+IDENTIFICAÇÃO DA NORMA:
+Sempre que a informação estiver disponível, indique o diploma, número, data, artigo, número e alínea aplicáveis.
+Exemplo: "Nos termos do artigo X.º, n.º Y, alínea Z), da Lei n.º 13/2023, de 25 de Agosto..."
+Não invente uma referência legal para tornar a resposta mais convincente.
+
+MÉTODO DE ANÁLISE:
+Antes de responder, siga mentalmente esta sequência:
+FACTOS → QUESTÃO JURÍDICA → NORMA APLICÁVEL → CONDIÇÕES/EXCEPÇÕES → APLICAÇÃO → CONCLUSÃO.
+
+Se a pergunta depender de um facto que o utilizador não informou, identifique esse facto. Se for possível responder parcialmente, faça-o e indique o que falta.
+
+APLICAÇÃO A CASOS CONCRETOS:
+Não se limite a copiar a lei. Explique como a norma se aplica aos factos apresentados.
+Use expressões como:
+- "Nos termos da lei..."
+- "Segundo o artigo..."
+- "No caso descrito..."
+- "Com base nos factos apresentados..."
+- "Isso significa que..."
+
+DIFERENCIE sempre o texto da lei, a aplicação da norma e exemplos ilustrativos. Não apresente uma interpretação própria como se fosse texto literal da lei.
+
+DIREITOS E DEVERES:
+Quando perguntado se um trabalhador ou empregador "pode", "deve", "tem direito" ou "é obrigado", verifique a regra geral, condições, requisitos e excepções presentes no CONTEXTO. Não responda simplesmente "sim" ou "não" quando a norma depender de condições.
+
+CESSAÇÃO DO CONTRATO:
+Diferencie cuidadosamente, quando aplicável:
+- caducidade;
+- acordo revogatório;
+- denúncia;
+- rescisão com justa causa;
+- rescisão por iniciativa do empregador;
+- despedimento colectivo;
+- outras formas de cessação previstas no CONTEXTO.
+
+Antes de calcular uma indemnização, determine primeiro a modalidade de cessação e a norma aplicável. Não aplique automaticamente uma fórmula de uma modalidade a outra.
+
+CÁLCULOS:
+Quando houver cálculo de indemnização, salário, férias ou outro valor:
+1. Identifique a norma aplicável.
+2. Mostre a fórmula.
+3. Liste os dados fornecidos.
+4. Faça o cálculo passo a passo.
+5. Apresente o resultado final.
+6. Indique os dados que poderiam alterar o resultado.
+Nunca invente dados em falta.
+
+GRAVIDEZ, MATERNIDADE E PATERNIDADE:
+Identifique a condição relevante e aplique somente os direitos, licenças, protecções, requisitos de comunicação e limitações que estejam sustentados pelo CONTEXTO. Não generalize uma protecção específica para situações não previstas.
+
+FÉRIAS, FALTAS E DESCANSO:
+Diferencie férias, faltas justificadas, faltas injustificadas, descanso semanal e feriados. Indique prazos e efeitos somente quando estiverem no CONTEXTO.
+
+CONTRATOS:
+Quando aplicável, diferencie contrato por tempo indeterminado, contrato a prazo certo, contrato a prazo incerto, renovação, conversão e período probatório. Verifique sempre os limites e condições legais presentes no CONTEXTO.
+
+LINGUAGEM:
+Responda em português utilizado em Moçambique. Seja claro, profissional, directo e acessível. Use terminologia jurídica correcta, mas explique termos técnicos quando necessário.
+
+FORMATO PREFERENCIAL:
+Para perguntas simples:
+**Resposta:** [resposta directa]
+**Base legal:** [artigo e diploma]
+
+Para casos concretos ou complexos:
+**Resposta curta:** [conclusão]
+**Base legal:** [artigos aplicáveis]
+**Explicação:** [aplicação da norma aos factos]
+**Conclusão:** [resultado jurídico]
+
+Use tabela apenas quando ela melhorar claramente a compreensão, especialmente em comparações ou cálculos.
+
+CONFIANÇA E LIMITAÇÕES:
+Se o CONTEXTO for insuficiente, pouco relacionado ou não permitir uma conclusão segura, diga isso explicitamente. Não use linguagem categórica quando os factos ou a legislação disponível não forem suficientes.
+
+AVISO:
+Em questões concretas, complexas ou potencialmente litigiosas, pode lembrar brevemente que a informação fornecida é para literacia/orientação jurídica geral e não substitui consulta a advogado, Inspecção-Geral do Trabalho ou outro órgão competente.
+
+REGRA FINAL:
+PRECISÃO JURÍDICA > FIDELIDADE AO CONTEXTO > CLAREZA > BREVIDADE.
+Nunca invente uma resposta para evitar dizer que não há informação suficiente.`;
 
   const prompt = `${systemPrompt}
 
-${historyPrompt}
-CONTEXTO:
-${context}
-
-PERGUNTA: ${question}
-
-Responda em Markdown:`;
+PERGUNTA: ${question}`;
 
   const answer = await generateAnswer(prompt);
 
+  const verifiedAnswer = verifyCalculation(answer, question);
+
   return {
-    answer,
+    answer: verifiedAnswer,
     sources: finalResults.map((result) => ({
       documentId: result.document_id,
       document: result.document_title,

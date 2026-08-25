@@ -8,4 +8,5 @@ export const config = {
   embeddingModel: process.env.EMBEDDING_MODEL || "nomic-embed-text",
   mockMode: process.env.MOCK_MODE === "true" || false,
   embeddingDimension: 768,
+  enableWhatsApp: process.env.ENABLE_WHATSAPP === "true" || false,
 };

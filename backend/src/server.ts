@@ -4,8 +4,10 @@ import cors from "@fastify/cors";
 import { config } from "./config";
 import { documentRoutes } from "./routes/documents";
 import { chatRoutes } from "./routes/chat";
+import { whatsappRoutes } from "./routes/whatsapp";
 import { prisma } from "./db";
 import { checkOllamaHealth } from "./services/ollama.service";
+import { startWhatsApp } from "./services/whatsapp.service";
 
 const app = Fastify({
   logger: {
@@ -90,6 +92,7 @@ async function bootstrap() {
 
   await app.register(documentRoutes, { prefix: "/" });
   await app.register(chatRoutes, { prefix: "/" });
+  await app.register(whatsappRoutes, { prefix: "/" });
 
   try {
     await app.listen({ port: config.port, host: "0.0.0.0" });
@@ -103,8 +106,15 @@ async function bootstrap() {
 ║  🔢 Embedding:    ${config.embeddingModel}
 ║  🐘 Postgres:     OK
 ║  🦙 Ollama URL:   ${config.ollamaUrl}
+║  📱 WhatsApp:     ${config.enableWhatsApp ? "A iniciar..." : "Desactivado"}
 ╚══════════════════════════════════════════════════╝
     `);
+
+    if (config.enableWhatsApp) {
+      startWhatsApp().catch((err) => {
+        app.log.error({ err }, "Erro ao iniciar WhatsApp");
+      });
+    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);

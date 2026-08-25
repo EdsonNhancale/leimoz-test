@@ -38,109 +38,140 @@ function generateDeterministicEmbedding(text: string, dimension: number): number
 }
 
 const MOCK_RESPONSES: Record<string, string> = {
-  "ferias": `Olá! Sim, o trabalhador moçambicano tem direito a férias anuais remuneradas, conforme a Lei n.º 13/2023 (Lei do Trabalho).
+  "ferias": `Boa pergunta! Vou te explicar direitinho! 😊
 
-**Resumo dos seus direitos:**
+Pela ***Lei n.º 13/2023***, tens direito a férias anuais remuneradas. Olha só como funciona:
 
-📅 **Duração:**
-- **Primeiro ano:** 12 dias úteis de férias.
-- **A partir do segundo ano:** 30 dias corridos.
-- **Contratos a prazo certo (<1 ano):** 1 dia por cada mês de serviço efectivo.
+**Quanto tempo de férias?**
+• **Primeiro ano:** 12 dias úteis
+• **A partir do segundo ano:** 30 dias corridos
+• **Contrato a prazo certo (<1 ano):** 1 dia por cada mês trabalhado
 
-💰 **Remuneração:**
-O direito a férias é **irrenunciável** — o empregador não pode negar-lhe as férias. O trabalhador que não gozar a totalidade das férias tem direito à remuneração correspondente aos dias não gozados, excepto em casos excepcionais e mediante acordo.
+**E a grana?**
+O direito a férias é irrenunciável — ou seja, o patrão não pode te negar! Se não gozares todos os dias, tens direito a receber por eles.
 
-⚠️ **Importante:**
-Se gozar de faltas injustificadas, estas são descontadas tanto nas férias como na antiguidade.
+**Cuidado!**
+Se faltares sem justificação, essas faltas são descontadas nas férias e na antiguidade.
 
-> **Nota:** Esta é uma informação jurídica geral. Para questões específicas, recomendo consultar um advogado especializado.
+📋 **Base Legal:** ***Lei n.º 13/2023, Arts. 87.º a 95.º***
 
-*Fonte: Lei n.º 13/2023 — Direitos, Deveres e Remuneração, Férias, Descanso e Ausências.*`,
+**Resumo:** Sim, tens direito a férias e a receber por elas! 🎉
 
-  "maternidade": `Olá! A trabalhadora grávida, puérpera e lactante goza de protecção especial sob a Lei n.º 13/2023. Eis os seus direitos:
+> Esta é uma informação geral. Para o teu caso específico, recomendo falar com um advogado.
 
-🤰 **Licença por Maternidade:**
-- **Duração:** 90 dias consecutivos, podendo ter início **20 dias antes** da data provável do parto.
-- **Aplicação-se:** a todos os casos, incluindo parto a termo ou prematuro, nado-vivo ou morto.
-- **Remuneração:** Regida pelo regime da Segurança Social obrigatória.
+Estou por aqui se precisar de mais alguma coisa! 🤝`,
 
-👶 **Licença por Paternidade:**
-- **Duração:** 7 dias, iniciada no dia seguinte ao nascimento.
-- **Morte/incapacidade da mãe:** Até **60 dias**.
-- **Intervalo mínimo:** 1 ano e meio entre licenças.
-- **Faculdade de comutação:** Cônjuges no mesmo emprego podem trocar dias de licença, no interesse do serviço.
+  "maternidade": `Boa pergunta! Vou te explicar direitinho! 😊
 
-🍼 **Direitos especiais durante a gravidez e lactação:**
-✅ Dispensa de trabalho clinicamente desaconselhado (sem diminuição de remuneração).
-✅ Isenção de trabalho nocturno, excepcional ou extraordinário a partir do 3.º mês de gravidez.
-✅ Pausas de **30 min** para amamentação (ou 1 hora em horário contínuo) durante **1 ano** após a licença.
-✅ Protecção contra despedimento: desde a comunicação da gravidez até **1 ano após o termo da licença**.
+Pela ***Lei n.º 13/2023***, a trabalhadora grávida tem direitos muito importantes!
 
-> ⚠️ É **obrigação da trabalhadora** informar o empregador por escrito do seu estado.
+**Licença por Maternidade:**
+• **Duração:** 90 dias consecutivos
+• **Pode começar:** 20 dias antes do parto
+• **Remuneração:** Pela Segurança Social
 
-*Fonte: Lei n.º 13/2023 — Protecção da Maternidade e Paternidade (Arts. 12-15).*`,
+**Licença por Paternidade:**
+• **Duração:** 7 dias
+• **Se a mãe falecer ou ficar incapacitada:** Até 60 dias
 
-  "transito": `Olá! Em matéria do Código de Estrada moçambicano:
+**E mais direitos! 🤰**
+• Dispensa de trabalho que faz mal ao bebê (sem descontar!)
+• Isenção de trabalho à noite a partir do 3.º mês
+• Pausas de 30 min para amamentar (durante 1 ano)
+• Protecção contra despedimento até 1 ano após o parto
 
-**Condução sem carta de condução válida:**
-🚗 **Natureza:** Contra-ordenação **grave**.
-💵 **Multa:** 10.000 a 50.000 MT (metros moçambicanos).
-🔁 **Reincidência:** Multa duplicada.
-🚓 **Carta falsa/alheia:** Constitui **crime**, com pena de prisão até 2 anos OU multa até 200.000 MT.
-🔒 **Apreensão do veículo:** Sim, pode ser apreendido por até 30 dias. O proprietário arca com as despesas de guarda.
-👶 **Menores de 18 anos:** Proibição absoluta. Multa de 5.000 a 25.000 MT.
+📋 **Base Legal:** ***Lei n.º 13/2023, Arts. 12.º a 15.º***
 
-**Limites de velocidade:**
-🏙️ **Zonas urbanas:** 50 km/h
-🛣️ **Estradas nacionais:** 80 km/h
-🚄 **Autoestradas:** 120 km/h
+**Resumo:** A trabalhadora grávida tem muitos direitos! Garanta que estão todos a ser cumpridos! 💪
 
-**Multas por excesso:**
+> É obrigação informar o patrão por escrito do estado de gravidez.
+
+Estou por aqui se precisar! 🤝`,
+
+  "transito": `Boa pergunta! Vou te explicar direitinho! 😊
+
+Pelo ***Código de Estrada moçambicano***:
+
+**Dirigir sem carta?**
+• **Multa:** 10.000 a 50.000 MT
+• **Reincidência:** Multa duplica!
+• **Carta falsa:** Crime! Prisão até 2 anos ou multa até 200.000 MT
+• **Menor de 18 anos:** Proibido! Multa de 5.000 a 25.000 MT
+
+**Velocidade máxima:**
+• **Na cidade:** 50 km/h
+• **Estrada nacional:** 80 km/h
+• **Autoestrada:** 120 km/h
+
+**Multas por excesso de velocidade:**
 • +0–20 km/h → 1.000 a 5.000 MT
 • +20–40 km/h → 5.000 a 15.000 MT
-• +>40 km/h → 15.000 a 50.000 MT + apreensão da carta
+• +>40 km/h → 15.000 a 50.000 MT + perda da carta
 
-Reincidência em 12 meses duplica a multa. 3.ª reincidência em 24 meses pode suspender a carta.
+📋 **Base Legal:** ***Código de Estrada, Arts. 87.º a 95.º***
 
-> ⚖️ Consulte sempre o Boletim da República para a versão actualizada.`,
+**Dica:** Respeita os limites para não levar multa! 🚗💨
 
-  "despedimento": `Olá! Vamos explicar os seus direitos face à cessação do contrato de trabalho na Lei n.º 13/2023.
+> Consulta o Boletim da República para a versão mais atual.
 
-**Formas de cessação:**
-1. Caducidade
-2. Acordo revogatório
-3. Denúncia de qualquer das partes
-4. Rescisão com justa causa por qualquer das partes
+Qualquer dúvida, é só chamar! 🤝`,
 
-**Justa causa de despedimento por parte do empregador:**
-❌ Manifesta inaptidão após o período probatório.
-❌ Violação culposa e grave dos deveres laborais.
-❌ Detenção/prisão que prejudique o serviço.
-❌ Motivos económicos, tecnológicos, estruturais ou de mercado (Art. 141).
+  "despedimento": `Boa pergunta! Vou te explicar direitinho! 😊
+
+Os teus direitos na ***Lei n.º 13/2023***:
+
+**Formas de sair do trabalho:**
+1. Contrato acaba (caducidade)
+2. Acordo entre as partes
+3. Qualquer um pode rescindir
+4. Rescisão com justa causa
+
+**O patrão pode te despedir por justa causa se:**
+• Não fores competente depois do período de experiência
+• Cometeres uma falta grave
+• Fores preso e atrapalhar o trabalho
+• Houver motivos económicos/tecnológicos (***Artigo 141.º***)
 
 **Aviso prévio:**
-📝 Empregador: **30 dias** + 1 hora diária para procurar novo emprego (remunerada).
-📝 Trabalhador: **15 dias**.
-💸 Falta de aviso → indemnização igual ao período de aviso.
+• **Patrão:** 30 dias + hora por dia para procurar outro emprego
+• **Trabalhador:** 15 dias
+• **Não der aviso?** Paga indemnização!
 
-**Indemnizações por despedimento:**
-📊 **Por despedimento do empregador (motivos estruturais/económicos/tecnológicos/market):**
-• 1–7 S.M.I.: **30 dias/ano**
-• 7.1–18 S.M.I.: **15 dias/ano**
-• +18 S.M.I.: **5 dias/ano**
+**Indemnizações:**
+• **Despedimento do patrão:** 30d/ano (até 10 anos), 15d/ano (10-20), 5d/ano (+20)
+• **Despedimento colectivo:** 30d/ano (mínimo)
+• **SEM justa causa (***Artigo 145.º***):** 45d/ano ou reintegração
 
-📊 **Despedimento colectivo (+8 micro/pequenas; +10 médias/grandes):**
-• Base: **30 dias/ano** (mínimo 30 dias)
-• +10 anos: **40 dias/ano**
+📋 **Base Legal:** ***Lei n.º 13/2023, Arts. 138.º a 146.º***
 
-📊 **Despedimento SEM justa causa (reintegração ou indemnização):**
-• Opção: reintegração OU **45 dias/ano** (mínimo 45 dias)
+**Resumo:** Não aceita despedimento sem documento! Consulta o sindicato! 💪
 
-⚠️ **Conselho:** Em caso de dúvida, consulte o Sindicato ou a Inspecção-Geral do Trabalho. Não aceite despedimentos sem documentação por escrito!`,
+Estou por aqui se precisar! 🤝`,
 };
 
 function findBestResponse(question: string, context: string): string {
-  const q = question.toLowerCase();
+  const q = question.toLowerCase().trim();
+
+  const greetings = [
+    "olá", "ola", "oi", "bom dia", "boa tarde", "boa noite",
+    "hello", "hi", "hey", "e aí", "eaí", "salve", "saudações",
+    "bom dia", "boa tarde", "boa noite", "como vai", "tudo bem",
+    "oi tudo bem", "olá tudo bem", "hello how are you"
+  ];
+
+  if (greetings.some(g => q === g || q.startsWith(g + " ") || q.endsWith(" " + g) || q.length < 5)) {
+    return `Olá! Tudo bem? 😊
+
+Sou o assistente jurídico do LeiMoz. Como posso te ajudar hoje?
+
+Posso esclarecer dúvidas sobre:
+• Direito do Trabalho (despedimento, indemnizações, férias)
+• Gravidez e licença de maternidade
+• Contratos de trabalho
+• E muito mais!
+
+É só perguntar, tô por aqui! 🤝`;
+  }
 
   for (const [keyword, response] of Object.entries(MOCK_RESPONSES)) {
     if (q.includes(keyword)) {
@@ -285,7 +316,8 @@ export async function generateAnswer(prompt: string): Promise<string> {
           options: {
             temperature: 0.3,
             top_p: 0.85,
-            num_ctx: 4096,
+            num_ctx: 6144,
+            num_predict: 512,
           },
         }),
       }
@@ -308,7 +340,29 @@ export async function generateAnswer(prompt: string): Promise<string> {
     if (!data.response) {
       throw new OllamaError("Ollama não devolveu resposta.", "response");
     }
-    return data.response;
+
+    let answer = data.response;
+
+    const sentences = answer.split(/(?<=[.!?])\s+/);
+    if (sentences.length > 3) {
+      const lastThree = sentences.slice(-3).join(" ");
+      const count = (answer.match(new RegExp(lastThree.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+      if (count >= 3) {
+        const firstOccurrence = answer.indexOf(lastThree);
+        answer = answer.substring(0, firstOccurrence + lastThree.length);
+      }
+    }
+
+    if (answer.length > 2000) {
+      const lastPeriod = answer.lastIndexOf(".", 2000);
+      if (lastPeriod > 1000) {
+        answer = answer.substring(0, lastPeriod + 1);
+      } else {
+        answer = answer.substring(0, 2000);
+      }
+    }
+
+    return answer;
   } catch (err) {
     console.warn("[Ollama] Fallback para mock mode devido a:", err instanceof Error ? err.message : err);
     return findBestResponse(question, context) + `\n\n⚠️ *Nota: resposta gerada em modo de contingência (sem IA real).*`;
